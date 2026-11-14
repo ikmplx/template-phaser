@@ -1,9 +1,14 @@
 """Запуск локального сервера игры без дополнительных библиотек."""
+import errno
 import functools
 import http.server
 import sys
 import webbrowser
 from pathlib import Path
+
+
+class GameServer(http.server.ThreadingHTTPServer):
+    allow_reuse_address = False
 
 
 def write_port_file(path, port):
@@ -15,7 +20,7 @@ def main():
     port_file = directory / '.server-port'
     handler = functools.partial(http.server.SimpleHTTPRequestHandler, directory=str(directory))
     try:
-        with http.server.ThreadingHTTPServer(('127.0.0.1', 0), handler) as server:
+        with GameServer(('127.0.0.1', 8000), handler) as server:
             port = server.server_port
             write_port_file(port_file, port)
             try:
@@ -36,7 +41,10 @@ def main():
     except KeyboardInterrupt:
         print('\nИгра остановлена.', flush=True)
     except OSError as error:
-        print(f'Не удалось запустить сервер: {error}', flush=True)
+        if error.errno == errno.EADDRINUSE or getattr(error, 'winerror', None) == 10048:
+            print('Порт 8000 уже занят. Закройте окно другого сервера и запустите игру снова.', flush=True)
+        else:
+            print(f'Не удалось запустить сервер: {error}', flush=True)
         return 1
     return 0
 
